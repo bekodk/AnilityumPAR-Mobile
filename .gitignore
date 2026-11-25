@@ -1,0 +1,6 @@
+# Yerel gizli API anahtarları ve derleme çıktıları GitHub'a yüklenmez
+www/local-config.js
+dist/
+__pycache__/
+*.pyc
+.DS_Store

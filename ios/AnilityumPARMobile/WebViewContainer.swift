@@ -14,8 +14,10 @@ struct WebViewContainer: UIViewRepresentable {
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
         config.allowsPictureInPictureMediaPlayback = true
+        config.allowsAirPlayForMediaPlayback = true
         config.websiteDataStore = .default()
         config.preferences.javaScriptCanOpenWindowsAutomatically = true
+        config.userContentController.add(context.coordinator, name: "keepAwake")
 
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.uiDelegate = context.coordinator
@@ -37,7 +39,14 @@ struct WebViewContainer: UIViewRepresentable {
         }
     }
 
-    final class Coordinator: NSObject, WKUIDelegate, WKNavigationDelegate {
+    final class Coordinator: NSObject, WKUIDelegate, WKNavigationDelegate, WKScriptMessageHandler {
+        func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            if message.name == "keepAwake", let enabled = message.body as? Bool {
+                DispatchQueue.main.async {
+                    UIApplication.shared.isIdleTimerDisabled = enabled
+                }
+            }
+        }
         func webView(
             _ webView: WKWebView,
             runJavaScriptAlertPanelWithMessage message: String,

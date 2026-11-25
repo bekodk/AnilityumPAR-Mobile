@@ -137,6 +137,12 @@
           <button class="np-ctl" id="npRepeatBtn" aria-label="Tekrarla"></button>
         </div>
 
+        <!-- EK ARAÇLAR: EKRANI AÇIK TUT & YOUTUBE'DA AÇ -->
+        <div class="np-util-row">
+          <button class="np-util-pill" id="npWakeBtn" type="button">Ekranı Açık Tut: Kapalı</button>
+          <a class="np-util-pill hidden" id="npOpenYtLink" href="#" target="_blank" rel="noopener noreferrer">YouTube'da Aç</a>
+        </div>
+
         <!-- ALT PANEL SEKMELERİ: ŞARKI SÖZLERİ & SIRADAKİLER -->
         <div class="np-subtabs">
           <button class="np-subtab active" data-subtab="lyrics">Şarkı Sözleri</button>
@@ -151,8 +157,8 @@
     </div>
   </section>
 
-  <!-- KALICI RESMİ YOUTUBE IFRAME OYNATICI (DOM'DA SABİT KALIR, KESİNTİSİZ ÇALAR) -->
-  <div class="yt-dock hidden-dock" id="ytDock">
+  <!-- KALICI RESMİ YOUTUBE IFRAME OYNATICI (DOM'DA SABİT KALIR, GÖRÜNÜR ALANDA ÇALAR) -->
+  <div class="yt-dock inactive-dock" id="ytDock">
     <div id="ytPlayerMount"></div>
   </div>
   <audio id="previewAudio" playsinline preload="auto"></audio>
@@ -199,6 +205,8 @@
 
   <!-- RESMİ YOUTUBE IFRAME PLAYER API -->
   <script src="https://www.youtube.com/iframe_api" async></script>
+  <!-- YEREL VARSAYILAN AYARLAR (OPSİYONEL) -->
+  <script src="local-config.js"></script>
   <!-- ÇOKLU FOTOĞRAF TARAYICI (YERLEŞİK OCR + İSTEĞE BAĞLI GEMİNİ AI) -->
   <script src="scanner.js"></script>
   <!-- ANA UYGULAMA MANTIĞI -->

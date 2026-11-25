@@ -89,17 +89,21 @@ const state = {
   dur: 0,
   shuffle: false,
   repeat: 'off', // 'off' | 'all' | 'one'
-  videoMode: false,
+  videoMode: true,
   npOpen: false,
   npSubtab: 'lyrics',
   lyrics: null, // { synced: [{t, text}], plain: string } | null
   activeLyricIdx: -1,
   seeking: false,
+  wakeLockOn: false,
+  wakeLockSentinel: null,
 
   // YouTube IFrame Player
   ytReady: false,
   ytPlayer: null,
   pendingYtId: null,
+  failedYtIds: new Set(),
+  fallbackInProgress: false,
 
   // Çoklu Fotoğraf Tarayıcı Durumu
   scanner: {
@@ -126,6 +130,7 @@ function defaultScanPlaylistName() {
 }
 
 function loadStorage() {
+  const defCfg = window.ANILITYUM_DEFAULT_CONFIG || {};
   try {
     const parsed = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
     return {
@@ -133,8 +138,8 @@ function loadStorage() {
       playlists: Array.isArray(parsed.playlists) ? parsed.playlists : [],
       history: Array.isArray(parsed.history) ? parsed.history : [],
       settings: {
-        youtubeApiKey: parsed.settings?.youtubeApiKey || '',
-        geminiApiKey: parsed.settings?.geminiApiKey || ''
+        youtubeApiKey: parsed.settings?.youtubeApiKey || defCfg.youtubeApiKey || '',
+        geminiApiKey: parsed.settings?.geminiApiKey || defCfg.geminiApiKey || ''
       }
     };
   } catch {
@@ -142,7 +147,10 @@ function loadStorage() {
       favorites: [],
       playlists: [],
       history: [],
-      settings: { youtubeApiKey: '', geminiApiKey: '' }
+      settings: {
+        youtubeApiKey: defCfg.youtubeApiKey || '',
+        geminiApiKey: defCfg.geminiApiKey || ''
+      }
     };
   }
 }
@@ -170,15 +178,24 @@ function toast(msg) {
 const previewAudio = $('#previewAudio');
 
 window.onYouTubeIframeAPIReady = function () {
-  initYouTubePlayer();
+  if (state.pendingYtId) {
+    initYouTubePlayer();
+  }
 };
 
 function initYouTubePlayer() {
   if (state.ytPlayer || !window.YT || !window.YT.Player) return;
+  const dock = $('#ytDock');
+  if (dock && dock.classList.contains('inactive-dock')) {
+    dock.classList.remove('inactive-dock');
+    dock.classList.add('pip-dock');
+  }
   state.ytPlayer = new window.YT.Player('ytPlayerMount', {
+    host: 'https://www.youtube.com',
     height: '180',
     width: '320',
     playerVars: {
+      autoplay: 1,
       playsinline: 1,
       rel: 0,
       modestbranding: 1,
@@ -187,8 +204,18 @@ function initYouTubePlayer() {
       origin: location.origin.startsWith('http') ? location.origin : undefined
     },
     events: {
-      onReady: () => {
+      onReady: (ev) => {
         state.ytReady = true;
+        try {
+          const iframe = ev.target.getIframe?.();
+          if (iframe) {
+            iframe.setAttribute('referrerpolicy', 'strict-origin-when-cross-origin');
+            iframe.setAttribute('allow', 'autoplay; encrypted-media; picture-in-picture; fullscreen');
+            iframe.setAttribute('allowfullscreen', '');
+          }
+        } catch {
+          /* yoksay */
+        }
         if (state.pendingYtId) {
           const id = state.pendingYtId;
           state.pendingYtId = null;
@@ -200,6 +227,7 @@ function initYouTubePlayer() {
         const YTState = window.YT.PlayerState;
         if (ev.data === YTState.PLAYING) {
           state.playing = true;
+          state.fallbackInProgress = false;
           updatePlayerUI();
         } else if (ev.data === YTState.PAUSED) {
           state.playing = false;
@@ -210,15 +238,64 @@ function initYouTubePlayer() {
       },
       onError: (ev) => {
         if (!state.cur || state.cur.source !== 'youtube') return;
-        const code = ev.data;
-        if (code === 101 || code === 150) {
-          toast('Bu YouTube videosu gömülü oynatmaya kapalı. Sonraki deneniyor...');
-        } else {
-          toast(`YouTube oynatma hatası (Kod: ${code})`);
-        }
+        handleYouTubePlayError(ev.data);
       }
     }
   });
+}
+
+async function handleYouTubePlayError(code) {
+  const cur = state.cur;
+  if (!cur || cur.source !== 'youtube') return;
+  if (cur.ytId) state.failedYtIds.add(cur.ytId);
+
+  if (state.fallbackInProgress) {
+    toast(`Video açılamadı (Kod: ${code}). "YouTube'da Aç" kullanabilirsin.`);
+    return;
+  }
+
+  state.fallbackInProgress = true;
+  const origTrackId = cur.id;
+  toast('Bu sürüm gömülü oynatmaya kapalı, oynatılabilir sürüm aranıyor...');
+
+  try {
+    if (state.data.settings.youtubeApiKey.trim()) {
+      const q = `${cur.artist && cur.artist !== 'YouTube' ? cur.artist + ' ' : ''}${cur.title} audio`.trim();
+      const candidates = await searchYouTube(q, 8);
+      if (state.cur?.id !== origTrackId) return;
+      const alt = candidates.find((c) => c.ytId && !state.failedYtIds.has(c.ytId));
+      if (alt) {
+        cur.ytId = alt.ytId;
+        if (!cur.thumb) cur.thumb = alt.thumb;
+        if (alt.duration) cur.duration = alt.duration;
+        state.ytPlayer.loadVideoById(alt.ytId);
+        updatePlayerUI();
+        toast('Alternatif oynatılabilir YouTube sürümü açıldı');
+        return;
+      }
+    }
+
+    // YouTube'da gömülebilir sürüm yoksa iTunes 30 sn önizlemeyi dene
+    const previewList = await searchItunes(`${cur.artist} ${cur.title}`.trim(), 3);
+    if (state.cur?.id !== origTrackId) return;
+    if (previewList.length && previewList[0].previewUrl) {
+      cur.source = 'itunes';
+      cur.previewUrl = previewList[0].previewUrl;
+      state.fallbackInProgress = false;
+      previewAudio.src = cur.previewUrl;
+      previewAudio.play().catch(() => {});
+      syncVideoDock();
+      updatePlayerUI();
+      toast('YouTube gömülü oynatmaya izin vermedi; önizleme açıldı');
+      return;
+    }
+
+    toast('Bu video gömülü oynatmaya kapalı — "YouTube\'da Aç" ile izleyebilirsin.');
+  } catch {
+    toast(`YouTube oynatma hatası (Kod: ${code})`);
+  } finally {
+    state.fallbackInProgress = false;
+  }
 }
 
 previewAudio.addEventListener('play', () => {
@@ -289,9 +366,10 @@ async function searchYouTube(query, maxResults = 12) {
   const key = state.data.settings.youtubeApiKey.trim();
   if (!key) throw new Error('YouTube API anahtarı ayarlı değil.');
 
+  const fetchCount = Math.min(25, Math.max(maxResults * 2, 18));
   const url =
     `https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true` +
-    `&maxResults=${maxResults}&q=${encodeURIComponent(query)}&key=${encodeURIComponent(key)}`;
+    `&maxResults=${fetchCount}&q=${encodeURIComponent(query)}&key=${encodeURIComponent(key)}`;
 
   const res = await fetch(url);
   const data = await res.json().catch(() => ({}));
@@ -303,23 +381,37 @@ async function searchYouTube(query, maxResults = 12) {
   if (!items.length) return [];
 
   const ids = items.map((i) => i.id?.videoId).filter(Boolean);
-  let durations = {};
+  const durations = {};
+  const embeddableMap = {};
   if (ids.length) {
     try {
       const vRes = await fetch(
-        `https://www.googleapis.com/youtube/v3/videos?part=contentDetails&id=${ids.join(',')}&key=${encodeURIComponent(key)}`
+        `https://www.googleapis.com/youtube/v3/videos?part=contentDetails,status&id=${ids.join(',')}&key=${encodeURIComponent(key)}`
       );
       const vData = await vRes.json();
       for (const v of vData.items || []) {
         durations[v.id] = parseIsoDuration(v.contentDetails?.duration);
+        const blocked = v.contentDetails?.regionRestriction?.blocked || [];
+        const allowed = v.contentDetails?.regionRestriction?.allowed;
+        const regionOk = !blocked.includes('TR') && (!Array.isArray(allowed) || allowed.includes('TR'));
+        embeddableMap[v.id] =
+          v.status?.embeddable !== false &&
+          v.status?.privacyStatus === 'public' &&
+          regionOk;
       }
     } catch {
-      /* süre opsiyonel */
+      /* detaylar opsiyonel */
     }
   }
 
-  return items
-    .filter((i) => i.id?.videoId)
+  const mapped = items
+    .filter((i) => {
+      const vid = i.id?.videoId;
+      if (!vid) return false;
+      if (state.failedYtIds.has(vid)) return false;
+      if (vid in embeddableMap && !embeddableMap[vid]) return false;
+      return true;
+    })
     .map((i) => {
       const vid = i.id.videoId;
       const meta = cleanYouTubeMeta(i.snippet?.title, i.snippet?.channelTitle);
@@ -334,6 +426,8 @@ async function searchYouTube(query, maxResults = 12) {
         duration: durations[vid] || 0
       };
     });
+
+  return mapped.slice(0, maxResults);
 }
 
 async function searchItunes(query, limit = 15) {
@@ -468,11 +562,13 @@ function playTrack(track, list = null, index = 0, contextName = 'AnilityumPAR') 
   // Geçmişe ekle
   state.data.history = [track, ...state.data.history.filter((t) => t.id !== track.id)].slice(0, 50);
   saveStorage();
+  state.fallbackInProgress = false;
 
-  // Diğer motoru durdur ve uygun motoru başlat
+  // Diğer motoru durdur ve uygun motoru başlat (iOS WebKit için önce görünür hale getir!)
   if (track.source === 'youtube' && track.ytId) {
     previewAudio.pause();
     previewAudio.removeAttribute('src');
+    syncVideoDock();
     if (state.ytReady && state.ytPlayer) {
       state.ytPlayer.loadVideoById(track.ytId);
     } else {
@@ -484,7 +580,6 @@ function playTrack(track, list = null, index = 0, contextName = 'AnilityumPAR') 
     if (state.ytReady && state.ytPlayer?.pauseVideo) {
       try { state.ytPlayer.pauseVideo(); } catch { /* yoksay */ }
     }
-    state.videoMode = false;
     previewAudio.src = track.previewUrl;
     previewAudio.play().catch(() => toast('Oynatmak için Çal tuşuna dokunun.'));
     state.playing = true;
@@ -780,6 +875,15 @@ function updatePlayerUI() {
   $('#npRepeatBtn').classList.toggle('on', state.repeat !== 'off');
   $('#npVideoToggle').classList.toggle('hidden', cur.source !== 'youtube');
   $('#npVideoToggle').classList.toggle('active', state.videoMode);
+  const ytLink = $('#npOpenYtLink');
+  if (ytLink) {
+    if (cur.ytId) {
+      ytLink.href = `https://www.youtube.com/watch?v=${cur.ytId}`;
+      ytLink.classList.remove('hidden');
+    } else {
+      ytLink.classList.add('hidden');
+    }
+  }
 
   renderQueuePanel();
 }
@@ -798,21 +902,56 @@ function updateProgressUI() {
 
 function syncVideoDock() {
   const dock = $('#ytDock');
-  const stage = $('#npStage');
+  const sheet = $('#npSheet');
   const artCard = $('#npArtCard');
-  const showStageVideo = state.npOpen && state.videoMode && state.cur?.source === 'youtube';
+  const isYt = state.cur?.source === 'youtube';
+  const showStageVideo = isYt && state.npOpen && state.videoMode;
+
+  sheet?.classList.toggle('video-pinned', showStageVideo);
+
+  if (!isYt) {
+    artCard.classList.remove('hidden');
+    dock.classList.remove('stage-dock', 'pip-dock');
+    dock.classList.add('inactive-dock');
+    return;
+  }
 
   if (showStageVideo) {
     artCard.classList.add('hidden');
-    if (dock.parentElement !== stage) stage.appendChild(dock);
-    dock.classList.remove('hidden-dock');
+    dock.classList.remove('inactive-dock', 'pip-dock');
     dock.classList.add('stage-dock');
   } else {
     artCard.classList.remove('hidden');
-    if (dock.parentElement !== document.body) document.body.appendChild(dock);
-    dock.classList.remove('stage-dock');
-    dock.classList.add('hidden-dock');
+    dock.classList.remove('inactive-dock', 'stage-dock');
+    dock.classList.add('pip-dock');
   }
+}
+
+async function toggleWakeLock() {
+  state.wakeLockOn = !state.wakeLockOn;
+  const btn = $('#npWakeBtn');
+  if (btn) {
+    btn.classList.toggle('on', state.wakeLockOn);
+    btn.textContent = state.wakeLockOn ? 'Ekranı Açık Tut: Açık' : 'Ekranı Açık Tut: Kapalı';
+  }
+  // Native iOS WKWebView köprüsü
+  try {
+    window.webkit?.messageHandlers?.keepAwake?.postMessage(state.wakeLockOn);
+  } catch {
+    /* yoksay */
+  }
+  // Tarayıcı / Safari Wake Lock API
+  try {
+    if (state.wakeLockOn && navigator.wakeLock?.request) {
+      state.wakeLockSentinel = await navigator.wakeLock.request('screen');
+    } else if (!state.wakeLockOn && state.wakeLockSentinel) {
+      await state.wakeLockSentinel.release();
+      state.wakeLockSentinel = null;
+    }
+  } catch {
+    /* tarayıcı desteklemiyorsa sessizce geç */
+  }
+  toast(state.wakeLockOn ? 'Ekran otomatik kapanmayacak' : 'Ekran uyku modu normale döndü');
 }
 
 function openNowPlaying() {
@@ -1913,6 +2052,7 @@ function boot() {
     toast(state.repeat === 'off' ? 'Tekrar kapalı' : state.repeat === 'all' ? 'Listeyi tekrarla' : 'Şarkıyı tekrarla');
     updatePlayerUI();
   });
+  $('#npWakeBtn')?.addEventListener('click', toggleWakeLock);
 
   // Seek bar
   const seek = $('#npSeek');
@@ -1952,10 +2092,6 @@ function boot() {
   // PWA Service Worker
   if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
     navigator.serviceWorker.register('./sw.js').catch(() => {});
-  }
-
-  if (window.YT && window.YT.Player) {
-    initYouTubePlayer();
   }
 
   renderView();
