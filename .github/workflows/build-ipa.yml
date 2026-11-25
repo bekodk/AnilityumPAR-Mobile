@@ -1,0 +1,54 @@
+name: Build iOS IPA
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-ipa:
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Prepare 1024x1024 AppIcon
+        run: |
+          mkdir -p ios/AnilityumPARMobile/Assets.xcassets/AppIcon.appiconset
+          sips -z 1024 1024 www/icon.png --out ios/AnilityumPARMobile/Assets.xcassets/AppIcon.appiconset/AppIcon.png
+
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+
+      - name: Build unsigned iOS app
+        working-directory: ios
+        run: |
+          xcodebuild \
+            -project AnilityumPARMobile.xcodeproj \
+            -scheme AnilityumPARMobile \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Package unsigned IPA
+        working-directory: ios
+        run: |
+          mkdir -p Payload
+          cp -R build/Build/Products/Release-iphoneos/AnilityumPARMobile.app Payload/
+          zip -r ../AnilityumPARMobile-unsigned.ipa Payload
+          ls -lh ../AnilityumPARMobile-unsigned.ipa
+
+      - name: Upload IPA Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AnilityumPARMobile-IPA
+          path: AnilityumPARMobile-unsigned.ipa
+          retention-days: 30

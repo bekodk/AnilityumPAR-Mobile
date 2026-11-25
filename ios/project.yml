@@ -1,0 +1,31 @@
+name: AnilityumPARMobile
+options:
+  bundleIdPrefix: com.anilityumv2
+  deploymentTarget:
+    iOS: "15.0"
+  xcodeVersion: "15.0"
+
+targets:
+  AnilityumPARMobile:
+    type: application
+    platform: iOS
+    deploymentTarget: "15.0"
+    sources:
+      - path: AnilityumPARMobile
+        excludes:
+          - Info.plist
+          - Resources/**
+      - path: ../www
+        type: folder
+        buildPhase: resources
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.anilityumv2.anilityumpar.mobile
+        PRODUCT_NAME: AnilityumPARMobile
+        SWIFT_VERSION: "5.0"
+        INFOPLIST_FILE: AnilityumPARMobile/Info.plist
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        TARGETED_DEVICE_FAMILY: "1,2"
+        SUPPORTS_MACCATALYST: NO
+        GENERATE_INFOPLIST_FILE: NO
+        ENABLE_USER_SCRIPT_SANDBOXING: NO

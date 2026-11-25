@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#000000">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="AnilityumPAR">
+  <title>AnilityumPAR Mobile</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="apple-touch-icon" href="icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <!-- ÜST BAŞLIK -->
+    <header class="app-header">
+      <div class="header-left">
+        <button class="back-btn hidden" id="headerBack" aria-label="Geri"></button>
+        <div class="brand-wrap" id="brandWrap">
+          <div class="brand-logo">
+            <img src="icon.png" alt="AnilityumPAR">
+          </div>
+          <div class="brand-text">
+            <span class="brand-name">AnilityumPAR</span>
+            <span class="brand-sub" id="modeBadge">YouTube &amp; Önizleme</span>
+          </div>
+        </div>
+      </div>
+      <div class="header-right">
+        <button class="icon-pill" id="btnQuickScan" title="Fotoğraftan Liste Oluştur"></button>
+        <button class="icon-pill" id="btnSettings" title="Ayarlar"></button>
+      </div>
+    </header>
+
+    <!-- ANA İÇERİK -->
+    <main class="main-view" id="mainView">
+      <div class="bg-glow" id="bgGlow"></div>
+      <div class="view-container" id="viewContainer"></div>
+    </main>
+
+    <!-- MİNİ OYNATICI -->
+    <div class="mini-player hidden" id="miniPlayer">
+      <div class="mini-progress-track">
+        <div class="mini-progress-fill" id="miniProgressFill"></div>
+      </div>
+      <div class="mini-body">
+        <button class="mini-track-tap" id="miniExpandBtn" type="button">
+          <div class="mini-cover" id="miniCover"></div>
+          <div class="mini-meta">
+            <div class="mini-title" id="miniTitle">AnilityumPAR</div>
+            <div class="mini-artist" id="miniArtist">Dinlemek için şarkı seç</div>
+          </div>
+        </button>
+        <div class="mini-actions">
+          <button class="mini-btn" id="miniFavBtn" aria-label="Favorilere ekle"></button>
+          <button class="mini-btn mini-play" id="miniPlayBtn" aria-label="Çal veya duraklat"></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ALT SEKME ÇUBUĞU -->
+    <nav class="tab-bar" id="tabBar" aria-label="Ana menü">
+      <button class="tab-item active" data-tab="home">
+        <span class="tab-icon" data-icon="home"></span>
+        <span class="tab-label">Ana Sayfa</span>
+      </button>
+      <button class="tab-item" data-tab="search">
+        <span class="tab-icon" data-icon="search"></span>
+        <span class="tab-label">Ara</span>
+      </button>
+      <button class="tab-item tab-scan" data-tab="scan">
+        <span class="tab-icon" data-icon="camera"></span>
+        <span class="tab-label">Tara</span>
+      </button>
+      <button class="tab-item" data-tab="library">
+        <span class="tab-icon" data-icon="library"></span>
+        <span class="tab-label">Kitaplık</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- TAM EKRAN ŞU AN ÇALAN (NOW PLAYING SHEET) -->
+  <section class="np-sheet" id="npSheet" aria-hidden="true">
+    <div class="np-backdrop" id="npBackdrop"></div>
+    <div class="np-inner">
+      <div class="np-topbar">
+        <button class="np-icon-btn" id="npCloseBtn" aria-label="Küçült"></button>
+        <div class="np-context">
+          <span class="np-context-label">ŞU ANDA ÇALAN</span>
+          <span class="np-context-title" id="npContextTitle">AnilityumPAR</span>
+        </div>
+        <div class="np-top-actions">
+          <button class="np-icon-btn" id="npVideoToggle" title="Video / Kapak"></button>
+          <button class="np-icon-btn" id="npAddPlaylistBtn" title="Çalma listesine ekle"></button>
+        </div>
+      </div>
+
+      <div class="np-scroll">
+        <!-- GÖRSEL / RESMİ YOUTUBE VİDEO ALANI -->
+        <div class="np-stage" id="npStage">
+          <div class="np-art-card" id="npArtCard">
+            <div class="np-art-img" id="npArtImg"></div>
+            <div class="np-source-chip" id="npSourceChip">YouTube</div>
+          </div>
+        </div>
+
+        <!-- ŞARKI BİLGİSİ -->
+        <div class="np-meta-row">
+          <div class="np-meta-text">
+            <h2 class="np-title" id="npTitle">Şarkı seçilmedi</h2>
+            <p class="np-artist" id="npArtist">Aramadan veya kitaplıktan bir şarkı seç</p>
+          </div>
+          <button class="np-fav-btn" id="npFavBtn" aria-label="Favori"></button>
+        </div>
+
+        <!-- İLERLEME ÇUBUĞU -->
+        <div class="np-seek-wrap">
+          <input type="range" id="npSeek" class="np-seek" min="0" max="1000" value="0" aria-label="Şarkı konumu">
+          <div class="np-times">
+            <span id="npTimeCur">0:00</span>
+            <span id="npTimeDur">0:00</span>
+          </div>
+        </div>
+
+        <!-- KONTROLLER -->
+        <div class="np-controls">
+          <button class="np-ctl" id="npShuffleBtn" aria-label="Karıştır"></button>
+          <button class="np-ctl" id="npPrevBtn" aria-label="Önceki"></button>
+          <button class="np-play-big" id="npPlayBtn" aria-label="Çal veya duraklat"></button>
+          <button class="np-ctl" id="npNextBtn" aria-label="Sonraki"></button>
+          <button class="np-ctl" id="npRepeatBtn" aria-label="Tekrarla"></button>
+        </div>
+
+        <!-- ALT PANEL SEKMELERİ: ŞARKI SÖZLERİ & SIRADAKİLER -->
+        <div class="np-subtabs">
+          <button class="np-subtab active" data-subtab="lyrics">Şarkı Sözleri</button>
+          <button class="np-subtab" data-subtab="queue">Sıradakiler</button>
+        </div>
+
+        <div class="np-subpanel" id="npLyricsPanel">
+          <div class="lyrics-empty">Şarkı sözleri yükleniyor...</div>
+        </div>
+        <div class="np-subpanel hidden" id="npQueuePanel"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- KALICI RESMİ YOUTUBE IFRAME OYNATICI (DOM'DA SABİT KALIR, KESİNTİSİZ ÇALAR) -->
+  <div class="yt-dock hidden-dock" id="ytDock">
+    <div id="ytPlayerMount"></div>
+  </div>
+  <audio id="previewAudio" playsinline preload="auto"></audio>
+
+  <!-- ÇALMA LİSTESİNE EKLE MODALI -->
+  <div class="modal-overlay" id="playlistModal">
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <h3>Çalma Listesine Ekle</h3>
+        <button class="modal-close" data-close="playlistModal" aria-label="Kapat"></button>
+      </div>
+      <div class="modal-body" id="playlistModalBody"></div>
+    </div>
+  </div>
+
+  <!-- YENİ ÇALMA LİSTESİ MODALI -->
+  <div class="modal-overlay" id="createPlaylistModal">
+    <div class="modal-sheet">
+      <div class="modal-head">
+        <h3>Yeni Çalma Listesi</h3>
+        <button class="modal-close" data-close="createPlaylistModal" aria-label="Kapat"></button>
+      </div>
+      <div class="modal-body">
+        <label class="field-label" for="newPlaylistName">Liste Adı</label>
+        <input class="text-input" id="newPlaylistName" type="text" placeholder="Örn: Gece Yolculuğu, Favori Mix...">
+        <button class="primary-btn full" id="confirmCreatePlaylistBtn" type="button">Oluştur</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- AYARLAR MODALI -->
+  <div class="modal-overlay" id="settingsModal">
+    <div class="modal-sheet tall">
+      <div class="modal-head">
+        <h3>Ayarlar &amp; API Bağlantıları</h3>
+        <button class="modal-close" data-close="settingsModal" aria-label="Kapat"></button>
+      </div>
+      <div class="modal-body" id="settingsModalBody"></div>
+    </div>
+  </div>
+
+  <!-- TOAST BİLDİRİMİ -->
+  <div class="toast" id="toast"></div>
+
+  <!-- RESMİ YOUTUBE IFRAME PLAYER API -->
+  <script src="https://www.youtube.com/iframe_api" async></script>
+  <!-- ÇOKLU FOTOĞRAF TARAYICI (YERLEŞİK OCR + İSTEĞE BAĞLI GEMİNİ AI) -->
+  <script src="scanner.js"></script>
+  <!-- ANA UYGULAMA MANTIĞI -->
+  <script src="app.js"></script>
+</body>
+</html>
